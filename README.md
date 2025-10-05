@@ -56,19 +56,19 @@ Git allows you to easily download and update the project.
 **Option A: Using Git (Recommended)**
 ```cmd
 git clone <repository-url>
-cd classic-scaper
+cd physioscraper
 ```
 
 **Option B: Without Git**
 - Download the project as a ZIP file
 - Extract it to a folder like `C:\Users\YourName\physiomatch-scraper`
-- Navigate into the `classic-scaper` folder
+- Navigate into the `physioscraper` folder
 
 #### 5. Install Project Dependencies
 
 Navigate to the project folder in Command Prompt:
 ```cmd
-cd C:\Users\YourName\physiomatch-scraper\classic-scaper
+cd C:\Users\YourName\physiomatch-scraper\physioscraper
 ```
 
 Then run:
@@ -96,7 +96,7 @@ This downloads the Chromium browser needed for web scraping.
    ```
 3. Navigate to project directory:
    ```bash
-   cd classic-scaper
+   cd physioscraper
    ```
 4. Install dependencies:
    ```bash
@@ -114,7 +114,7 @@ This downloads the Chromium browser needed for web scraping.
 1. Open Command Prompt
 2. Navigate to the project folder:
    ```cmd
-   cd C:\Users\YourName\physiomatch-scraper\classic-scaper
+   cd C:\Users\YourName\physiomatch-scraper\physioscraper
    ```
 3. Run the scraper:
    ```cmd
@@ -124,7 +124,7 @@ This downloads the Chromium browser needed for web scraping.
 ### macOS/Linux
 
 ```bash
-cd classic-scaper
+cd physioscraper
 uv run scraper.py
 ```
 
