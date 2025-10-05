@@ -43,11 +43,19 @@ def main():
         CREATE TABLE IF NOT EXISTS jobs (
             job_number TEXT PRIMARY KEY,
             date TEXT,
+            employer TEXT,
             title TEXT,
             url TEXT
         )
     """)
-    conn.commit()
+
+    # Add employer column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute("ALTER TABLE jobs ADD COLUMN employer TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
 
     new_jobs = []
 
@@ -67,6 +75,10 @@ def main():
         jobs = page.query_selector_all("article.tease-jobad")
 
         for job in jobs:
+            # Extract employer
+            employer_element = job.query_selector("p.tease-jobad__company")
+            employer = employer_element.inner_text().strip() if employer_element else "N/A"
+
             # Extract title
             title_element = job.query_selector("h2.tease-jobad__title")
             title = title_element.inner_text() if title_element else "N/A"
@@ -92,26 +104,52 @@ def main():
                 new_jobs.append({
                     'job_number': job_number,
                     'date': parsed_date,
+                    'employer': employer,
                     'title': title,
                     'url': url
                 })
                 print(f"\n🆕 NEW JOB FOUND!")
                 print(f"Job Number: {job_number}")
                 print(f"Date: {parsed_date}")
+                print(f"Employer: {employer}")
                 print(f"Title: {title}")
                 print(f"URL: {url}")
                 print("-" * 80)
 
                 # Insert new job into database
                 cursor.execute("""
-                    INSERT INTO jobs (job_number, date, title, url)
-                    VALUES (?, ?, ?, ?)
-                """, (job_number, str(parsed_date), title, url))
+                    INSERT INTO jobs (job_number, date, employer, title, url)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (job_number, str(parsed_date), employer, title, url))
 
         browser.close()
 
     # Commit and close database
     conn.commit()
+
+    # Find new employers
+    new_employers = set()
+    if new_jobs:
+        # Get all existing employers from database (excluding the jobs we just added)
+        cursor.execute("SELECT DISTINCT employer FROM jobs WHERE employer IS NOT NULL")
+        all_employers = {row[0] for row in cursor.fetchall()}
+
+        # Get employers from new jobs
+        new_job_employers = {job['employer'] for job in new_jobs if job['employer'] != "N/A"}
+
+        # Find employers that appear in new jobs but weren't in the database before
+        for employer in new_job_employers:
+            # Check if this employer existed before (count jobs with this employer, excluding new ones)
+            cursor.execute("""
+                SELECT COUNT(*) FROM jobs
+                WHERE employer = ? AND job_number NOT IN ({})
+            """.format(','.join('?' * len(new_jobs))),
+            [employer] + [job['job_number'] for job in new_jobs])
+
+            count = cursor.fetchone()[0]
+            if count == 0:
+                new_employers.add(employer)
+
     conn.close()
 
     # Summary
@@ -121,6 +159,12 @@ def main():
             print(f"  - {job['job_number']}: {job['title']}")
     else:
         print(f"\n✅ No new jobs found. Database is up to date.")
+
+    # New employers report
+    if new_employers:
+        print(f"\n🏢 Found {len(new_employers)} new employer(s)!")
+        for employer in sorted(new_employers):
+            print(f"  - {employer}")
 
 
 if __name__ == "__main__":
