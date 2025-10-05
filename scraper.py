@@ -57,6 +57,10 @@ def main():
         # Column already exists
         pass
 
+    # Get existing employers before scraping
+    cursor.execute("SELECT DISTINCT employer FROM jobs WHERE employer IS NOT NULL AND employer != 'N/A'")
+    existing_employers = {row[0] for row in cursor.fetchall()}
+
     new_jobs = []
 
     with sync_playwright() as p:
@@ -130,25 +134,11 @@ def main():
     # Find new employers
     new_employers = set()
     if new_jobs:
-        # Get all existing employers from database (excluding the jobs we just added)
-        cursor.execute("SELECT DISTINCT employer FROM jobs WHERE employer IS NOT NULL")
-        all_employers = {row[0] for row in cursor.fetchall()}
-
         # Get employers from new jobs
         new_job_employers = {job['employer'] for job in new_jobs if job['employer'] != "N/A"}
 
-        # Find employers that appear in new jobs but weren't in the database before
-        for employer in new_job_employers:
-            # Check if this employer existed before (count jobs with this employer, excluding new ones)
-            cursor.execute("""
-                SELECT COUNT(*) FROM jobs
-                WHERE employer = ? AND job_number NOT IN ({})
-            """.format(','.join('?' * len(new_jobs))),
-            [employer] + [job['job_number'] for job in new_jobs])
-
-            count = cursor.fetchone()[0]
-            if count == 0:
-                new_employers.add(employer)
+        # Find employers that weren't in the database before scraping
+        new_employers = new_job_employers - existing_employers
 
     conn.close()
 
