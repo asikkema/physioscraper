@@ -7,7 +7,7 @@ Scrapes job listings from https://physioswiss.ch/
 from playwright.sync_api import sync_playwright
 from datetime import datetime
 import re
-import csv
+import sqlite3
 
 
 def parse_job_number(number_text):
@@ -34,6 +34,23 @@ def parse_german_date(date_text):
 
 def main():
     """Main entry point for the scraper"""
+    # Set up database
+    conn = sqlite3.connect("jobs.db")
+    cursor = conn.cursor()
+
+    # Create table with job_number as primary key
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS jobs (
+            job_number TEXT PRIMARY KEY,
+            date TEXT,
+            title TEXT,
+            url TEXT
+        )
+    """)
+    conn.commit()
+
+    new_jobs = []
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         page = browser.new_page()
@@ -49,40 +66,61 @@ def main():
         # Extract all job listings
         jobs = page.query_selector_all("article.tease-jobad")
 
-        # Open CSV file for writing
-        with open("jobs.csv", "w", newline="", encoding="utf-8") as csvfile:
-            csv_writer = csv.writer(csvfile)
-            # Write header
-            csv_writer.writerow(["Job Number", "Date", "Title", "URL"])
+        for job in jobs:
+            # Extract title
+            title_element = job.query_selector("h2.tease-jobad__title")
+            title = title_element.inner_text() if title_element else "N/A"
 
-            for job in jobs:
-                # Extract title
-                title_element = job.query_selector("h2.tease-jobad__title")
-                title = title_element.inner_text() if title_element else "N/A"
+            # Extract URL
+            link_element = job.query_selector("a.tease-jobad__link")
+            url = link_element.get_attribute("href") if link_element else "N/A"
 
-                # Extract URL
-                link_element = job.query_selector("a.tease-jobad__link")
-                url = link_element.get_attribute("href") if link_element else "N/A"
+            # Extract job number
+            number_element = job.query_selector("p.tease-jobad__number")
+            job_number = parse_job_number(number_element.inner_text()) if number_element else "N/A"
 
-                # Extract job number
-                number_element = job.query_selector("p.tease-jobad__number")
-                job_number = parse_job_number(number_element.inner_text()) if number_element else "N/A"
+            # Extract and parse date
+            date_element = job.query_selector("p.tease-jobad__date time")
+            parsed_date = parse_german_date(date_element.inner_text()) if date_element else "N/A"
 
-                # Extract and parse date
-                date_element = job.query_selector("p.tease-jobad__date time")
-                parsed_date = parse_german_date(date_element.inner_text()) if date_element else "N/A"
+            # Check if job already exists in database
+            cursor.execute("SELECT job_number FROM jobs WHERE job_number = ?", (job_number,))
+            exists = cursor.fetchone()
 
-                # Write to CSV
-                csv_writer.writerow([job_number, parsed_date, title, url])
-
-                # Print to console
+            if not exists:
+                # New job found!
+                new_jobs.append({
+                    'job_number': job_number,
+                    'date': parsed_date,
+                    'title': title,
+                    'url': url
+                })
+                print(f"\n🆕 NEW JOB FOUND!")
                 print(f"Job Number: {job_number}")
                 print(f"Date: {parsed_date}")
                 print(f"Title: {title}")
                 print(f"URL: {url}")
                 print("-" * 80)
 
+                # Insert new job into database
+                cursor.execute("""
+                    INSERT INTO jobs (job_number, date, title, url)
+                    VALUES (?, ?, ?, ?)
+                """, (job_number, str(parsed_date), title, url))
+
         browser.close()
+
+    # Commit and close database
+    conn.commit()
+    conn.close()
+
+    # Summary
+    if new_jobs:
+        print(f"\n✅ Found {len(new_jobs)} new job(s)!")
+        for job in new_jobs:
+            print(f"  - {job['job_number']}: {job['title']}")
+    else:
+        print(f"\n✅ No new jobs found. Database is up to date.")
 
 
 if __name__ == "__main__":
