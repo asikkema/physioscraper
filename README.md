@@ -61,7 +61,7 @@ cd physioscraper
 
 **Option B: Without Git**
 - Download the project as a ZIP file
-- Extract it to a folder like `C:\Users\YourName\physiomatch-scraper`
+- Extract it to a folder like `C:\Users\YourName\physioscraper`
 - Navigate into the `physioscraper` folder
 
 #### 5. Install Project Dependencies
