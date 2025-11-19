@@ -32,13 +32,10 @@ def parse_german_date(date_text):
     return "N/A"
 
 
-def main():
-    """Main entry point for the scraper"""
-    # Set up database
+def setup_database():
     conn = sqlite3.connect("jobs.db")
     cursor = conn.cursor()
 
-    # Create table with job_number as primary key
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             job_number TEXT PRIMARY KEY,
@@ -49,69 +46,51 @@ def main():
         )
     """)
 
-    # Add employer column if it doesn't exist (for existing databases)
     try:
         cursor.execute("ALTER TABLE jobs ADD COLUMN employer TEXT")
         conn.commit()
     except sqlite3.OperationalError:
-        # Column already exists
         pass
 
-    # Get existing employers before scraping
     cursor.execute("SELECT DISTINCT employer FROM jobs WHERE employer IS NOT NULL AND employer != 'N/A'")
     existing_employers = {row[0] for row in cursor.fetchall()}
+    return conn, cursor, existing_employers
 
+
+def scrape_new_jobs(cursor):
     new_jobs = []
-
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-
-        # Navigate to the jobs page
         page.goto("https://physioswiss.ch/stelleninserate/?_per_page=5000")
-
         print("Scraper is ready!")
-
-        # Wait for job listings to load
         page.wait_for_selector("article.tease-jobad")
-
-        # Extract all job listings
         jobs = page.query_selector_all("article.tease-jobad")
 
         for job in jobs:
-            # Extract employer
             employer_element = job.query_selector("p.tease-jobad__company")
             employer = employer_element.inner_text().strip() if employer_element else "N/A"
-
-            # Extract title
             title_element = job.query_selector("h2.tease-jobad__title")
             title = title_element.inner_text() if title_element else "N/A"
-
-            # Extract URL
             link_element = job.query_selector("a.tease-jobad__link")
             url = link_element.get_attribute("href") if link_element else "N/A"
-
-            # Extract job number
             number_element = job.query_selector("p.tease-jobad__number")
             job_number = parse_job_number(number_element.inner_text()) if number_element else "N/A"
-
-            # Extract and parse date
             date_element = job.query_selector("p.tease-jobad__date time")
             parsed_date = parse_german_date(date_element.inner_text()) if date_element else "N/A"
 
-            # Check if job already exists in database
             cursor.execute("SELECT job_number FROM jobs WHERE job_number = ?", (job_number,))
             exists = cursor.fetchone()
 
             if not exists:
-                # New job found!
-                new_jobs.append({
+                new_job = {
                     'job_number': job_number,
                     'date': parsed_date,
                     'employer': employer,
                     'title': title,
                     'url': url
-                })
+                }
+                new_jobs.append(new_job)
                 print(f"\n🆕 NEW JOB FOUND!")
                 print(f"Job Number: {job_number}")
                 print(f"Date: {parsed_date}")
@@ -120,7 +99,6 @@ def main():
                 print(f"URL: {url}")
                 print("-" * 80)
 
-                # Insert new job into database
                 cursor.execute("""
                     INSERT INTO jobs (job_number, date, employer, title, url)
                     VALUES (?, ?, ?, ?, ?)
@@ -128,21 +106,17 @@ def main():
 
         browser.close()
 
-    # Commit and close database
-    conn.commit()
+    return new_jobs
 
-    # Find new employers
-    new_employers = set()
-    if new_jobs:
-        # Get employers from new jobs
-        new_job_employers = {job['employer'] for job in new_jobs if job['employer'] != "N/A"}
 
-        # Find employers that weren't in the database before scraping
-        new_employers = new_job_employers - existing_employers
+def find_new_employers(new_jobs, existing_employers):
+    if not new_jobs:
+        return set()
+    new_job_employers = {job['employer'] for job in new_jobs if job['employer'] != "N/A"}
+    return new_job_employers - existing_employers
 
-    conn.close()
 
-    # Summary
+def report_results(new_jobs, new_employers):
     if new_jobs:
         print(f"\n✅ Found {len(new_jobs)} new job(s)!")
         for job in new_jobs:
@@ -150,11 +124,20 @@ def main():
     else:
         print(f"\n✅ No new jobs found. Database is up to date.")
 
-    # New employers report
     if new_employers:
         print(f"\n🏢 Found {len(new_employers)} new employer(s)!")
         for employer in sorted(new_employers):
             print(f"  - {employer}")
+
+
+def main():
+    """Main entry point for the scraper"""
+    conn, cursor, existing_employers = setup_database()
+    new_jobs = scrape_new_jobs(cursor)
+    conn.commit()
+    new_employers = find_new_employers(new_jobs, existing_employers)
+    conn.close()
+    report_results(new_jobs, new_employers)
 
 
 if __name__ == "__main__":
