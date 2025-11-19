@@ -2,7 +2,7 @@ name: Daily Scraper
 
 on:
   schedule:
-    - cron: "0 7 * * *"         # run daily at 07:00 UTC
+    - cron: "0 10 * * *"         # run daily at 10:00 UTC
   workflow_dispatch:             # allow manual runs
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}     # optional for email later
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
-        run: uv run main.py
+        run: uv run scraper.py
 
       # ---------------------------
       # Commit updated SQLite DB if changed
