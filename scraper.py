@@ -168,6 +168,8 @@ def send_email(subject: str, body: str):
     msg["From"] = smtp_user
     msg["To"] = recipients
 
+    print(f"sending email to {recipients}, with smtp_password {smtp_pass} and smtp_user {smtp_user} and smtp_server {smtp_server} and smtp_port {smtp_port}")   
+
     with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
         server.login(smtp_user, smtp_pass)
         server.sendmail(smtp_user, recipients, msg.as_string())
