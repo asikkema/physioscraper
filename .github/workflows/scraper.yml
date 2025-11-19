@@ -50,7 +50,7 @@ jobs:
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}     # if you add email later
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
-        run: uv run main.py
+        run: uv run scraper.py
 
       # ---------------------------
       # Commit updated SQLite DB (jobs.db)

@@ -6,7 +6,5 @@ dist/
 wheels/
 *.egg-info
 
-jobs.db
-
 # Virtual environments
 .venv
