@@ -1,0 +1,75 @@
+name: Daily Scraper
+
+on:
+  schedule:
+    - cron: "0 7 * * *"   # every day at 07:00 UTC
+  workflow_dispatch:       # allow manual triggering
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---------------------------
+      # Checkout repo
+      # ---------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true   # so that pushes work
+
+      # ---------------------------
+      # Install uv (package manager)
+      # ---------------------------
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      # ---------------------------
+      # Install Python version from pyproject.toml
+      # uv will auto-detect required Python if you set requires-python = ">=3.11"
+      # ---------------------------
+      - name: Setup Python
+        run: uv python install
+
+      # ---------------------------
+      # Install dependencies (Playwright, etc.)
+      # ---------------------------
+      - name: Install dependencies
+        run: uv sync
+
+      # ---------------------------
+      # Install Playwright browsers (Chromium)
+      # ---------------------------
+      - name: Install Playwright Chromium
+        run: uv run playwright install chromium
+
+      # ---------------------------
+      # Run the scraper
+      # ---------------------------
+      - name: Run scraper
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}     # if you add email later
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+        run: uv run main.py
+
+      # ---------------------------
+      # Commit updated SQLite DB (jobs.db)
+      # ---------------------------
+      - name: Commit database changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          # stage only DB file to prevent accidents
+          git add jobs.db
+
+          # commit only if DB changed
+          git diff --cached --quiet || git commit -m "Update jobs.db"
+
+      # ---------------------------
+      # Push changes back to repo
+      # ---------------------------
+      - name: Push changes
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
