@@ -6,9 +6,19 @@ Scrapes job listings from https://physioswiss.ch/
 
 from playwright.sync_api import sync_playwright
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import re
 import sqlite3
+import os
 
+sender = os.getenv("EMAIL_FROM")
+recipient = os.getenv("EMAIL_TO")
+smtp_server = os.getenv("SMTP_SERVER")
+smtp_port = int(os.getenv("SMTP_PORT"))
+smtp_user = os.getenv("SMTP_USER")
+smtp_pass = os.getenv("SMTP_PASS")
 
 def parse_job_number(number_text):
     """Extract job number from text like 'Nr. J-502200'"""
@@ -129,15 +139,59 @@ def report_results(new_jobs, new_employers):
         for employer in sorted(new_employers):
             print(f"  - {employer}")
 
+def build_report_text(new_jobs, new_employers):
+    """Return report text instead of printing it."""
+
+    lines = []
+
+    if new_jobs:
+        lines.append(f"Found {len(new_jobs)} new job(s):")
+        for job in new_jobs:
+            lines.append(f"- {job['job_number']}: {job['title']} ({job['employer']})")
+            lines.append(f"  {job['url']}")
+        lines.append("")  # spacing
+    else:
+        lines.append("No new jobs found. Database is up to date.\n")
+
+    if new_employers:
+        lines.append(f"Found {len(new_employers)} new employer(s):")
+        for employer in sorted(new_employers):
+            lines.append(f"- {employer}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+def send_email(subject, body, sender, recipient, smtp_server, smtp_port, smtp_user, smtp_pass):
+    """Send a plain-text email with the report."""
+    msg = MIMEMultipart()
+    msg["From"] = sender
+    msg["To"] = recipient
+    msg["Subject"] = subject
+
+    msg.attach(MIMEText(body, "plain"))
+
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
+    print("Email sent successfully")
+
 
 def main():
     """Main entry point for the scraper"""
     conn, cursor, existing_employers = setup_database()
+    
     new_jobs = scrape_new_jobs(cursor)
+    
     conn.commit()
-    new_employers = find_new_employers(new_jobs, existing_employers)
     conn.close()
+    
+    new_employers = find_new_employers(new_jobs, existing_employers)    
+    
     report_results(new_jobs, new_employers)
+    email_body = build_report_text(new_jobs, new_employers) 
+    print(f"sending email to {recipient}, with smtp_password {smtp_pass} and smtp_user {smtp_user} and smtp_server {smtp_server} and smtp_port {smtp_port}")   
+    send_email("PhysioScraper Report", email_body, sender, recipient, smtp_server, smtp_port, smtp_user, smtp_pass)
 
 
 if __name__ == "__main__":

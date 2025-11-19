@@ -192,3 +192,13 @@ Each run only reports jobs and employers that are truly new since the last run.
 **Browser doesn't open**: Run `uv run playwright install chromium` to install the browser.
 
 **Permission errors on Windows**: Run Command Prompt as Administrator (right-click → "Run as administrator").
+
+
+
+
+export EMAIL_FROM=a.sikkema80@gmail.com
+export EMAIL_TO=a.sikkema80@gmail.com
+export SMTP_USER=a.sikkema80@gmail.com
+export SMTP_PASS=ldsc llix ield sxfu
+export SMTP_SERVER=smtp.gmail.com
+export SMTP_PORT=587
