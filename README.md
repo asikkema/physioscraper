@@ -199,6 +199,6 @@ Each run only reports jobs and employers that are truly new since the last run.
 export EMAIL_FROM=a.sikkema80@gmail.com
 export EMAIL_TO=a.sikkema80@gmail.com
 export SMTP_USER=a.sikkema80@gmail.com
-export SMTP_PASS=ldsc llix ield sxfu
+export SMTP_PASS="ldsc llix ield sxfu"
 export SMTP_SERVER=smtp.gmail.com
 export SMTP_PORT=587
