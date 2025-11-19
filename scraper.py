@@ -161,14 +161,16 @@ def send_email(subject: str, body: str):
     smtp_pass = os.getenv("SMTP_PASS")
     smtp_server = os.getenv("SMTP_SERVER")
     smtp_port = int(os.getenv("SMTP_PORT"))
-    recipients = os.getenv("EMAIL_TO")
+    
+    recipients_raw = os.getenv("EMAIL_TO")
+    if not recipients_raw:
+        raise RuntimeError("EMAIL_TO not set")
+    recipients = [addr.strip() for addr in recipients_raw.split(",")]
 
     msg = MIMEText(body, "plain")
     msg["Subject"] = subject
     msg["From"] = smtp_user
-    msg["To"] = recipients
-
-    print(f"sending email to {recipients}, with smtp_password {smtp_pass} and smtp_user {smtp_user} and smtp_server {smtp_server} and smtp_port {smtp_port}")   
+    msg["To"] = ", ".join(recipients)
 
     with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
         server.login(smtp_user, smtp_pass)
@@ -186,10 +188,13 @@ def main():
     conn.close()
     
     new_employers = find_new_employers(new_jobs, existing_employers)    
-    
     report_results(new_jobs, new_employers)
-    email_body = build_report_text(new_jobs, new_employers)     
-    send_email("PhysioScraper Report", email_body)
+    
+    if new_jobs or new_employers:
+        email_body = build_report_text(new_jobs, new_employers)     
+        send_email("PhysioScraper Report", email_body)
+    else:
+        print("No new jobs or employers found. No email sent.")
 
 
 if __name__ == "__main__":
